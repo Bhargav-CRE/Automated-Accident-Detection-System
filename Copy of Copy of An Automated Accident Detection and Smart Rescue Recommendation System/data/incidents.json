@@ -1,0 +1,12 @@
+[
+  {
+    "id": "003a208b-094a-4f94-94a9-4c522f784888",
+    "image_path": "/static/uploads/acc1 (13).jpg",
+    "confidence": 62.8,
+    "location": "near raghu collage",
+    "notes": "Auto-reported from detection",
+    "status": "resolved",
+    "created_at": "2026-03-16 23:49",
+    "updated_at": "2026-03-16 23:54"
+  }
+]

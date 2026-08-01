@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Rescue — Accident Detection AI{% endblock %}
+{% block content %}
+<section class="min-h-screen py-12 bg-mesh">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="mb-10">
+            <h1 class="font-display text-3xl font-bold mb-2 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                    <i data-lucide="ambulance" class="w-5 h-5 text-red-400"></i>
+                </div>
+                Rescue System
+            </h1>
+            <p class="text-gray-500">Manage accident alerts and emergency response requests.</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                        <i data-lucide="clock" class="w-6 h-6 text-amber-400"></i>
+                    </div>
+                    <span class="text-2xl font-display font-bold text-amber-400">{{ pending|length }}</span>
+                </div>
+                <p class="text-gray-500 text-sm">Pending</p>
+                <p class="text-gray-400 text-xs mt-1">Awaiting response</p>
+            </div>
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="w-12 h-12 rounded-xl bg-accent-blue/20 flex items-center justify-center">
+                        <i data-lucide="send" class="w-6 h-6 text-accent-blue"></i>
+                    </div>
+                    <span class="text-2xl font-display font-bold text-accent-blue">{{ alert_sent|length }}</span>
+                </div>
+                <p class="text-gray-500 text-sm">Alert Sent</p>
+                <p class="text-gray-400 text-xs mt-1">Emergency notified</p>
+            </div>
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                        <i data-lucide="check-circle" class="w-6 h-6 text-green-400"></i>
+                    </div>
+                    <span class="text-2xl font-display font-bold text-green-400">{{ resolved|length }}</span>
+                </div>
+                <p class="text-gray-500 text-sm">Resolved</p>
+                <p class="text-gray-400 text-xs mt-1">Case closed</p>
+            </div>
+        </div>
+
+        <!-- Pending -->
+        <div class="glass rounded-2xl border border-white/5 overflow-hidden mb-8">
+            <div class="p-6 border-b border-white/5">
+                <h2 class="font-semibold text-lg flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-amber-400"></i>
+                    Pending incidents
+                </h2>
+                <p class="text-gray-500 text-sm mt-1">Request rescue from the demo page when an accident is detected.</p>
+            </div>
+            <div class="divide-y divide-white/5">
+                {% for inc in pending %}
+                <div class="p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
+                    <div class="w-24 h-20 rounded-xl overflow-hidden bg-dark-700 flex-shrink-0">
+                        {% if inc.image_path %}
+                        <img src="{{ inc.image_path }}" alt="" class="w-full h-full object-cover">
+                        {% else %}
+                        <div class="w-full h-full flex items-center justify-center"><i data-lucide="image" class="w-8 h-8 text-gray-500"></i></div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-400">{{ inc.created_at }}</p>
+                        <p class="font-medium text-gray-200 mt-0.5">Confidence: <span class="text-red-400">{{ "%.1f"|format(inc.confidence) }}%</span></p>
+                        <form method="POST" action="{{ url_for('rescue_edit_location', incident_id=inc.id) }}" class="mt-2 flex flex-wrap items-center gap-2">
+                            <input type="text" name="location" value="{{ inc.location or '' }}" placeholder="Add or edit location (address, coordinates…)" class="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-dark-700 border border-white/10 text-gray-200 text-sm placeholder-gray-500 focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 outline-none">
+                            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple text-sm font-medium hover:bg-accent-purple/30 transition">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Save
+                            </button>
+                        </form>
+                        {% if inc.notes %}<p class="text-sm text-gray-500 mt-1">{{ inc.notes }}</p>{% endif %}
+                    </div>
+                    <div class="flex flex-wrap gap-2 sm:flex-shrink-0">
+                        <form method="POST" action="{{ url_for('rescue_update_status', incident_id=inc.id) }}" class="inline">
+                            <input type="hidden" name="status" value="alert_sent">
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue/20 text-accent-blue text-sm font-medium hover:bg-accent-blue/30 transition">
+                                <i data-lucide="send" class="w-4 h-4"></i> Mark Alert Sent
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('rescue_update_status', incident_id=inc.id) }}" class="inline">
+                            <input type="hidden" name="status" value="resolved">
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium hover:bg-green-500/30 transition">
+                                <i data-lucide="check" class="w-4 h-4"></i> Resolve
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% else %}
+                <div class="p-12 text-center text-gray-500">
+                    <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                    <p>No pending incidents.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Alert sent -->
+        <div class="glass rounded-2xl border border-white/5 overflow-hidden mb-8">
+            <div class="p-6 border-b border-white/5">
+                <h2 class="font-semibold text-lg flex items-center gap-2">
+                    <i data-lucide="send" class="w-5 h-5 text-accent-blue"></i>
+                    Alert sent
+                </h2>
+            </div>
+            <div class="divide-y divide-white/5">
+                {% for inc in alert_sent %}
+                <div class="p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
+                    <div class="w-24 h-20 rounded-xl overflow-hidden bg-dark-700 flex-shrink-0">
+                        {% if inc.image_path %}<img src="{{ inc.image_path }}" alt="" class="w-full h-full object-cover">{% else %}<div class="w-full h-full flex items-center justify-center"><i data-lucide="image" class="w-8 h-8 text-gray-500"></i></div>{% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-400">{{ inc.created_at }}{% if inc.updated_at %} · Updated {{ inc.updated_at }}{% endif %}</p>
+                        <p class="font-medium text-gray-200 mt-0.5">Confidence: <span class="text-red-400">{{ "%.1f"|format(inc.confidence) }}%</span></p>
+                        <form method="POST" action="{{ url_for('rescue_edit_location', incident_id=inc.id) }}" class="mt-2 flex flex-wrap items-center gap-2">
+                            <input type="text" name="location" value="{{ inc.location or '' }}" placeholder="Add or edit location" class="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-dark-700 border border-white/10 text-gray-200 text-sm placeholder-gray-500 focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 outline-none">
+                            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple text-sm font-medium hover:bg-accent-purple/30 transition">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Save
+                            </button>
+                        </form>
+                    </div>
+                    <form method="POST" action="{{ url_for('rescue_update_status', incident_id=inc.id) }}" class="inline">
+                        <input type="hidden" name="status" value="resolved">
+                        <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium hover:bg-green-500/30 transition">
+                            <i data-lucide="check" class="w-4 h-4"></i> Mark Resolved
+                        </button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="p-8 text-center text-gray-500 text-sm">None yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Resolved -->
+        <div class="glass rounded-2xl border border-white/5 overflow-hidden">
+            <div class="p-6 border-b border-white/5">
+                <h2 class="font-semibold text-lg flex items-center gap-2">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-green-400"></i>
+                    Resolved
+                </h2>
+            </div>
+            <div class="divide-y divide-white/5">
+                {% for inc in resolved %}
+                <div class="p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
+                    <div class="w-24 h-20 rounded-xl overflow-hidden bg-dark-700 flex-shrink-0">
+                        {% if inc.image_path %}<img src="{{ inc.image_path }}" alt="" class="w-full h-full object-cover">{% else %}<div class="w-full h-full flex items-center justify-center"><i data-lucide="image" class="w-8 h-8 text-gray-500"></i></div>{% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-400">{{ inc.created_at }}{% if inc.updated_at %} · Resolved {{ inc.updated_at }}{% endif %}</p>
+                        <p class="font-medium text-gray-200 mt-0.5">Confidence: <span class="text-red-400">{{ "%.1f"|format(inc.confidence) }}%</span></p>
+                        <form method="POST" action="{{ url_for('rescue_edit_location', incident_id=inc.id) }}" class="mt-2 flex flex-wrap items-center gap-2">
+                            <input type="text" name="location" value="{{ inc.location or '' }}" placeholder="Add or edit location" class="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-dark-700 border border-white/10 text-gray-200 text-sm placeholder-gray-500 focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 outline-none">
+                            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple text-sm font-medium hover:bg-accent-purple/30 transition">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Save
+                            </button>
+                        </form>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 text-sm font-medium">
+                        <i data-lucide="check" class="w-4 h-4"></i> Resolved
+                    </span>
+                </div>
+                {% else %}
+                <div class="p-8 text-center text-gray-500 text-sm">No resolved incidents yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

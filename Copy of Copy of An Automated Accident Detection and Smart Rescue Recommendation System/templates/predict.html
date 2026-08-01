@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Try Demo — Accident Detection AI{% endblock %}
+{% block head %}
+<style>
+    .drop-zone.dragover { border-color: rgba(139, 92, 246, 0.6); background: rgba(139, 92, 246, 0.05); }
+    .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .result-enter { animation: resultEnter 0.4s ease-out forwards; }
+    @keyframes resultEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+{% endblock %}
+{% block content %}
+<section class="min-h-[calc(100vh-8rem)] py-12 bg-mesh">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <p class="text-accent-purple font-medium text-sm uppercase tracking-widest mb-2">Demo</p>
+            <h1 class="font-display text-3xl sm:text-4xl font-bold mb-4">AI Accident Detection</h1>
+            <p class="text-gray-400 max-w-xl mx-auto">Upload a CCTV frame or image. Our model will analyze it and predict whether an accident is detected.</p>
+        </div>
+
+        <form id="predictForm" method="POST" action="/predict" enctype="multipart/form-data" class="space-y-8">
+            <div class="glass rounded-2xl p-6 sm:p-8 border border-white/5">
+                <div id="dropZone" class="drop-zone relative rounded-xl border-2 border-dashed border-white/10 hover:border-accent-purple/40 bg-dark-800/50 transition-all duration-300 p-12 text-center cursor-pointer min-h-[240px] flex flex-col items-center justify-center">
+                    <input type="file" name="image" id="fileInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
+                    <div id="uploadPrompt" class="pointer-events-none">
+                        <div class="w-16 h-16 rounded-2xl glass flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="upload-cloud" class="w-8 h-8 text-accent-purple"></i>
+                        </div>
+                        <p class="font-semibold text-gray-300 mb-1">Drag & drop your image here</p>
+                        <p class="text-gray-500 text-sm">or click to browse</p>
+                        <p class="text-gray-600 text-xs mt-2">PNG, JPG, WebP up to 10MB</p>
+                    </div>
+                    <div id="imagePreview" class="hidden pointer-events-none w-full">
+                        <img id="previewImg" src="" alt="Preview" class="max-h-64 mx-auto rounded-lg object-contain">
+                        <p id="previewName" class="text-sm text-gray-400 mt-2 truncate max-w-xs mx-auto"></p>
+                        <button type="button" id="clearPreview" class="mt-3 text-sm text-red-400 hover:text-red-300 transition">Remove image</button>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                    <button type="submit" id="submitBtn" class="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-accent-purple to-accent-blue text-white font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed btn-glow">
+                        <i data-lucide="scan-search" class="w-5 h-5" id="btnIcon"></i>
+                        <span id="btnText">Predict</span>
+                    </button>
+                    <button type="button" id="resetBtn" class="px-6 py-3.5 rounded-xl glass font-medium hover:bg-white/10 transition hidden">
+                        Upload another
+                    </button>
+                </div>
+            </div>
+
+            <div id="loadingState" class="hidden glass rounded-2xl p-8 border border-white/5 text-center">
+                <div class="spinner mx-auto mb-4"></div>
+                <p class="font-semibold text-gray-300">Analyzing image...</p>
+                <p class="text-gray-500 text-sm mt-1">AI model is processing your frame</p>
+            </div>
+
+            {% if prediction is defined and prediction %}
+            <div id="resultCard" class="result-enter glass rounded-2xl p-6 sm:p-8 border border-white/5">
+                <p class="text-sm text-gray-500 mb-4">Prediction result</p>
+                <div class="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                    {% if image_path %}
+                    <div class="rounded-xl overflow-hidden border border-white/10 bg-dark-800 flex-shrink-0">
+                        <img src="{{ image_path }}" alt="Uploaded" class="w-48 h-32 object-cover">
+                    </div>
+                    {% endif %}
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                            {% if prediction == 'Accident' %}
+                            <div class="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                                <i data-lucide="alert-triangle" class="w-6 h-6 text-red-400"></i>
+                            </div>
+                            <div>
+                                <p class="font-display text-xl font-bold text-red-400">Accident</p>
+                                <p class="text-gray-500 text-sm">Potential accident detected in frame</p>
+                            </div>
+                            {% else %}
+                            <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                                <i data-lucide="shield-check" class="w-6 h-6 text-green-400"></i>
+                            </div>
+                            <div>
+                                <p class="font-display text-xl font-bold text-green-400">Non Accident</p>
+                                <p class="text-gray-500 text-sm">No accident detected — scene appears safe</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg {% if prediction == 'Accident' %}bg-red-500/10 border border-red-500/20{% else %}bg-green-500/10 border border-green-500/20{% endif %}">
+                            <i data-lucide="percent" class="w-4 h-4 {% if prediction == 'Accident' %}text-red-400{% else %}text-green-400{% endif %}"></i>
+                            <span class="font-semibold {% if prediction == 'Accident' %}text-red-400{% else %}text-green-400{% endif %}">Confidence: {{ "%.1f"|format(confidence) }}%</span>
+                        </div>
+                        {% if prediction == 'Accident' %}
+                        <div id="rescueStatus" class="mt-6 pt-6 border-t border-white/10" data-image-path="{{ image_path }}" data-confidence="{{ "%.1f"|format(confidence) }}">
+                            <p class="text-sm text-gray-400 flex items-center gap-2">
+                                <span class="animate-spin inline-block w-4 h-4 border-2 border-red-400/50 border-t-red-400 rounded-full"></span>
+                                Adding to Rescue system and getting your location…
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadPrompt = document.getElementById('uploadPrompt');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+    const previewName = document.getElementById('previewName');
+    const clearPreview = document.getElementById('clearPreview');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
+    const resetBtn = document.getElementById('resetBtn');
+    const loadingState = document.getElementById('loadingState');
+    const resultCard = document.getElementById('resultCard');
+    const form = document.getElementById('predictForm');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+        dropZone.addEventListener(ev, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+    ['dragenter', 'dragover'].forEach(ev => {
+        dropZone.addEventListener(ev, () => dropZone.classList.add('dragover'));
+    });
+    ['dragleave', 'drop'].forEach(ev => {
+        dropZone.addEventListener(ev, () => dropZone.classList.remove('dragover'));
+    });
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length && files[0].type.startsWith('image/')) {
+            fileInput.files = files;
+            showPreview(files[0]);
+        }
+    });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) showPreview(fileInput.files[0]);
+    });
+    clearPreview.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput.value = '';
+        uploadPrompt.classList.remove('hidden');
+        imagePreview.classList.add('hidden');
+        resetBtn.classList.add('hidden');
+    });
+    resetBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        uploadPrompt.classList.remove('hidden');
+        imagePreview.classList.add('hidden');
+        resetBtn.classList.add('hidden');
+        if (resultCard) resultCard.remove();
+    });
+
+    function showPreview(file) {
+        const url = URL.createObjectURL(file);
+        previewImg.src = url;
+        previewName.textContent = file.name;
+        uploadPrompt.classList.add('hidden');
+        imagePreview.classList.remove('hidden');
+        resetBtn.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', () => {
+        submitBtn.disabled = true;
+        btnText.textContent = 'Analyzing...';
+        if (btnIcon) btnIcon.style.display = 'none';
+        loadingState.classList.remove('hidden');
+    });
+
+    if (resultCard) {
+        resetBtn.classList.remove('hidden');
+        resetBtn.onclick = () => { window.location.href = '/predict'; };
+    }
+
+    // Auto-add accident to Rescue system with current location
+    (function() {
+        const rescueStatus = document.getElementById('rescueStatus');
+        if (!rescueStatus) return;
+        const imagePath = rescueStatus.getAttribute('data-image-path') || '';
+        const confidence = rescueStatus.getAttribute('data-confidence') || '0';
+        let rescueSubmitted = false;
+        function submitRescue(locationStr) {
+            if (rescueSubmitted) return;
+            rescueSubmitted = true;
+            const form = new FormData();
+            form.append('image_path', imagePath);
+            form.append('confidence', confidence);
+            form.append('location', locationStr);
+            form.append('notes', 'Auto-reported from detection');
+            form.append('ajax', '1');
+            fetch('/rescue/request', {
+                method: 'POST',
+                body: form,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(r) {
+                if (!r.ok) throw new Error('Server error');
+                return r.json();
+            })
+            .then(function(data) {
+                rescueStatus.innerHTML = '<div class="rounded-lg bg-green-500/10 border border-green-500/20 p-3"><p class="text-sm font-medium text-green-400 flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4 flex-shrink-0"></i>Added to Rescue system.' + (data.location ? ' Your location was captured.' : '') + '</p><a href="/rescue" class="text-sm text-accent-purple hover:underline mt-1 inline-block">View Rescue dashboard →</a></div>';
+                if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            })
+            .catch(function() {
+                rescueStatus.innerHTML = '<p class="text-sm text-amber-400">Rescue system update failed. <a href="/rescue" class="underline">View Rescue dashboard</a>.</p>';
+            });
+        }
+        // Submit within 1.5s no matter what (geolocation often blocked on HTTP or slow)
+        var fallbackTimer = setTimeout(function() {
+            if (!rescueSubmitted) submitRescue('Location unavailable');
+        }, 1500);
+        function cancelFallback() { clearTimeout(fallbackTimer); }
+        if (!navigator.geolocation) {
+            cancelFallback();
+            submitRescue('Location unavailable');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                cancelFallback();
+                var loc = pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6);
+                submitRescue(loc);
+            },
+            function() {
+                cancelFallback();
+                submitRescue('Location unavailable');
+            },
+            { enableHighAccuracy: false, timeout: 1000, maximumAge: 60000 }
+        );
+    })();
+
+    lucide.createIcons();
+</script>
+{% endblock %}

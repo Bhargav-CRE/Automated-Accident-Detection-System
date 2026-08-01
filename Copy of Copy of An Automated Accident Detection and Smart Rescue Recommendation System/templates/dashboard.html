@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Accident Detection AI{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .chart-container { position: relative; height: 220px; }
+</style>
+{% endblock %}
+{% block content %}
+<section class="min-h-screen py-12 bg-mesh">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="mb-10">
+            <h1 class="font-display text-3xl font-bold mb-2">Dashboard</h1>
+            <p class="text-gray-500">Analytics and prediction history for your accident detection system.</p>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-accent-purple/20 flex items-center justify-center">
+                        <i data-lucide="image" class="w-6 h-6 text-accent-purple"></i>
+                    </div>
+                    <span class="text-xs text-gray-500 font-medium">Total</span>
+                </div>
+                <p class="text-2xl font-display font-bold text-white">{{ stats.total_images }}</p>
+                <p class="text-gray-500 text-sm mt-1">Images Processed</p>
+            </div>
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                        <i data-lucide="alert-triangle" class="w-6 h-6 text-red-400"></i>
+                    </div>
+                    <span class="text-xs text-gray-500 font-medium">Detected</span>
+                </div>
+                <p class="text-2xl font-display font-bold text-red-400">{{ stats.accidents_detected }}</p>
+                <p class="text-gray-500 text-sm mt-1">Accidents Detected</p>
+            </div>
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                        <i data-lucide="shield-check" class="w-6 h-6 text-green-400"></i>
+                    </div>
+                    <span class="text-xs text-gray-500 font-medium">Safe</span>
+                </div>
+                <p class="text-2xl font-display font-bold text-green-400">{{ stats.non_accidents }}</p>
+                <p class="text-gray-500 text-sm mt-1">Non-Accidents</p>
+            </div>
+            <div class="glass rounded-2xl p-6 border border-white/5 hover-lift">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-accent-cyan/20 flex items-center justify-center">
+                        <i data-lucide="target" class="w-6 h-6 text-accent-cyan"></i>
+                    </div>
+                    <span class="text-xs text-gray-500 font-medium">Model</span>
+                </div>
+                <p class="text-2xl font-display font-bold text-accent-cyan">{{ stats.accuracy }}%</p>
+                <p class="text-gray-500 text-sm mt-1">Model Accuracy</p>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-8 mb-10">
+            <!-- Chart -->
+            <div class="lg:col-span-2 glass rounded-2xl p-6 border border-white/5">
+                <h2 class="font-semibold text-lg mb-4">Detection Overview</h2>
+                <div class="chart-container">
+                    <canvas id="overviewChart"></canvas>
+                </div>
+            </div>
+            <div class="glass rounded-2xl p-6 border border-white/5">
+                <h2 class="font-semibold text-lg mb-4">Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="donutChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prediction history -->
+        <div class="glass rounded-2xl border border-white/5 overflow-hidden">
+            <div class="p-6 border-b border-white/5">
+                <h2 class="font-semibold text-lg">Prediction History</h2>
+                <p class="text-gray-500 text-sm mt-1">Recent image analyses and results</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-sm text-gray-500 border-b border-white/5">
+                            <th class="py-4 px-6 font-medium">Image</th>
+                            <th class="py-4 px-6 font-medium">Result</th>
+                            <th class="py-4 px-6 font-medium">Confidence</th>
+                            <th class="py-4 px-6 font-medium">Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in history %}
+                        <tr class="border-b border-white/5 hover:bg-white/[0.02] transition">
+                            <td class="py-4 px-6">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-lg overflow-hidden bg-dark-700 flex-shrink-0">
+                                        {% if item.image_path %}
+                                        <img src="{{ item.image_path }}" alt="" class="w-full h-full object-cover">
+                                        {% else %}
+                                        <div class="w-full h-full flex items-center justify-center">
+                                            <i data-lucide="image" class="w-5 h-5 text-gray-500"></i>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <span class="text-sm text-gray-300 truncate max-w-[120px]">{{ item.filename or 'Image' }}</span>
+                                </div>
+                            </td>
+                            <td class="py-4 px-6">
+                                {% if item.prediction == 'Accident' %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-sm font-medium">
+                                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Accident
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-400 text-sm font-medium">
+                                    <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Non Accident
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-6">
+                                <span class="text-sm font-medium {% if item.prediction == 'Accident' %}text-red-400{% else %}text-green-400{% endif %}">{{ "%.1f"|format(item.confidence) }}%</span>
+                            </td>
+                            <td class="py-4 px-6 text-sm text-gray-500">{{ item.timestamp }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="py-12 px-6 text-center text-gray-500">
+                                <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                                <p>No predictions yet. <a href="/predict" class="text-accent-purple hover:underline">Try the demo</a> to get started.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+    lucide.createIcons();
+
+    const history = {{ history_json | safe }};
+    const accidents = history.filter(h => h.prediction === 'Accident').length;
+    const nonAccidents = history.filter(h => h.prediction === 'Non Accident').length;
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { labels: { color: '#9ca3af' } }
+        },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+        }
+    };
+
+    if (document.getElementById('overviewChart')) {
+        new Chart(document.getElementById('overviewChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Accidents', 'Non-Accidents'],
+                datasets: [{
+                    label: 'Count',
+                    data: [accidents, nonAccidents],
+                    backgroundColor: ['rgba(239, 68, 68, 0.6)', 'rgba(34, 197, 94, 0.6)'],
+                    borderColor: ['rgb(239, 68, 68)', 'rgb(34, 197, 94)'],
+                    borderWidth: 1
+                }]
+            },
+            options: chartOptions
+        });
+    }
+
+    if (document.getElementById('donutChart')) {
+        new Chart(document.getElementById('donutChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Accident', 'Non Accident'],
+                datasets: [{
+                    data: [accidents, nonAccidents],
+                    backgroundColor: ['rgba(239, 68, 68, 0.8)', 'rgba(34, 197, 94, 0.8)'],
+                    borderColor: ['rgb(239, 68, 68)', 'rgb(34, 197, 94)'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                ...chartOptions,
+                cutout: '65%'
+            }
+        });
+    }
+</script>
+{% endblock %}
